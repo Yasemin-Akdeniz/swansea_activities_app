@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swansea Activities</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        /* Custom CSS - Minimal as Bootstrap handles most styling */
+        body {
+            background-color: #f8f9fa; /* Lighter background */
+        }
+        .container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .activity-card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,.05); /* Subtle shadow for cards */
+            transition: transform 0.2s ease-in-out; /* Smooth hover effect */
+        }
+        .activity-card:hover {
+            transform: translateY(-5px); /* Lift card on hover */
+        }
+        .activity-card .card-title {
+            color: #007bff; /* Bootstrap primary blue */
+        }
+        .activity-card .card-text {
+            font-size: 0.95em;
+            color: #555;
+        }
+        .activity-card .card-footer {
+            font-size: 0.85em;
+            color: #6c757d; /* Muted text */
+        }
+        .no-activities, #loading-message, #error-message, #no-activities-found {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        #error-message.alert-danger {
+            color: #721c24; /* Red text for error */
+            background-color: #f8d7da; /* Light red background */
+            border-color: #f5c6cb; /* Red border */
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand mx-auto" href="/">
+                <i class="bi bi-geo-alt-fill me-2"></i> Swansea Activities
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="text-center mb-4 mt-4 text-primary">Explore Activities in Swansea</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-8 mx-auto">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="Search activities by title or description..." id="searchInput">
+                    <button class="btn btn-primary" type="button" id="searchButton">Search</button>
+                </div>
+                <div class="d-flex justify-content-center mb-3">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="costFilter" id="allCosts" value="all" checked>
+                        <label class="form-check-label" for="allCosts">All Costs</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="costFilter" id="freeOnly" value="free">
+                        <label class="form-check-label" for="freeOnly">Free Only</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="loading-message" class="alert alert-info" role="alert">
+            Loading activities...
+        </div>
+        <div id="error-message" class="alert alert-danger" role="alert" style="display: none;">
+            Failed to load activities. Please try again later.
+        </div>
+
+        <div id="activity-list" class="row">
+            </div>
+
+        <div id="no-activities-found" class="alert alert-warning" role="alert" style="display: none;">
+            No activities found yet. Try running the scraper!
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const activityListDiv = document.getElementById('activity-list');
+            const loadingMessage = document.getElementById('loading-message');
+            const errorMessage = document.getElementById('error-message');
+            const noActivitiesMessage = document.getElementById('no-activities-found');
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const costFilterRadios = document.querySelectorAll('input[name="costFilter"]');
+
+            // Function to fetch and display activities
+            function fetchAndDisplayActivities() {
+                loadingMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                noActivitiesMessage.style.display = 'none';
+                activityListDiv.innerHTML = ''; // Clear existing content
+
+                const searchTerm = searchInput.value;
+                const selectedCostFilter = document.querySelector('input[name="costFilter"]:checked').value;
+
+                let apiUrl = 'http://127.0.0.1:5000/activities?';
+                const params = [];
+
+                if (searchTerm) {
+                    params.push(`search=${encodeURIComponent(searchTerm)}`);
+                }
+                if (selectedCostFilter !== 'all') {
+                    params.push(`cost=${encodeURIComponent(selectedCostFilter)}`); // Will send 'free' if selected
+                }
+
+                if (params.length > 0) {
+                    apiUrl += params.join('&');
+                }
+                
+                fetch(apiUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(activities => {
+                        loadingMessage.style.display = 'none';
+
+                        if (activities.length === 0) {
+                            noActivitiesMessage.style.display = 'block';
+                            return;
+                        }
+
+                        activities.forEach(activity => {
+                            const colDiv = document.createElement('div');
+                            colDiv.className = 'col-md-4';
+
+                            const activityCard = document.createElement('div');
+                            activityCard.className = 'card activity-card h-100';
+
+                            activityCard.innerHTML = `
+                                <div class="card-body">
+                                    <h5 class="card-title">${activity.title}</h5>
+                                    <p class="card-text">${activity.description}</p>
+                                </div>
+                                <div class="card-footer bg-light">
+                                    <strong>Date:</strong> ${activity.date}<br>
+                                    <strong>Location:</strong> ${activity.location}<br>
+                                    <strong>Cost:</strong> ${activity.cost}<br>
+                                    ${activity.source_url ? `<a href="${activity.source_url}" target="_blank" class="card-link mt-2 d-block">View Source</a>` : ''}
+                                </div>
+                            `;
+                            colDiv.appendChild(activityCard);
+                            activityListDiv.appendChild(colDiv);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching activities:', error);
+                        loadingMessage.style.display = 'none';
+                        errorMessage.style.display = 'block';
+                    });
+            }
+
+            // Event Listeners for Search and Filter
+            searchButton.addEventListener('click', fetchAndDisplayActivities);
+            searchInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    fetchAndDisplayActivities();
+                }
+            });
+            costFilterRadios.forEach(radio => {
+                radio.addEventListener('change', fetchAndDisplayActivities);
+            });
+
+            // Initial load of activities
+            fetchAndDisplayActivities();
+        });
+    </script>
+</body>
+</html>
